@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RISHI MS Attendance Management</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+      position: relative;
+    }
+
+    h2 { text-align: center; }
+
+    .container, .login-container {
+      max-width: 1000px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      position: relative;
+      z-index: 1;
+    }
+
+    input, select, button {
+      margin: 5px;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+
+    .actions button {
+      margin: 0 2px;
+    }
+
+    .right {
+      float: right;
+      margin-top: -30px;
+    }
+
+    .group-header {
+      background-color: #d0e7ff;
+      font-weight: bold;
+      text-align: left;
+      padding: 10px;
+    }
+
+    .logo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 80px;
+      height: auto;
+      z-index: 2;
+    }
+
+    #mainContainer::before {
+      content: "";
+      background: url('rishi-logo.jpg.jpeg') no-repeat center center;
+      background-size: 300px;
+      opacity: 0.05;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <audio id="alertAudio" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+  <img src="rishi-logo.jpg.jpeg" alt="Rishi Logo" class="logo">
+
+  <div class="login-container" id="loginContainer">
+    <h2>Login - RISHI MS Attendance</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="login()">Login</button>
+    <button onclick="forgotPassword()">Forgot Password</button>
+  </div>
+
+  <div class="container" id="mainContainer" style="display: none;">
+    <h2>RISHI MS Attendance Management</h2>
+    <div class="right">
+      <button onclick="changePassword()">Change Password</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div>
+      <input type="text" id="name" placeholder="Name">
+      <input type="text" id="roll" placeholder="Roll No">
+      <input type="text" id="dept" placeholder="Department">
+      <input type="number" id="year" placeholder="Year">
+      <button onclick="addStudent()">Add Student</button>
+      <button onclick="markAttendance()">Mark Attendance</button>
+      <button onclick="exportToExcel()">Export to Excel</button>
+    </div>
+
+    <div>
+      <label>Dept:</label><input type="text" id="filterDept">
+      <label>Year:</label><input type="number" id="filterYear">
+      <label>Date:</label><input type="date" id="filterDate">
+      <label>Month:</label><input type="number" id="filterMonth" min="1" max="12">
+      <label>Year (Attendance):</label><input type="number" id="filterAttendanceYear">
+      <button onclick="filterStudents()">Filter</button>
+      <button onclick="loadStudents()">Reset</button>
+    </div>
+
+    <div id="attendanceMarking"></div>
+
+    <table id="studentTable">
+      <thead>
+        <tr>
+          <th>Name</th><th>Roll</th><th>Dept</th><th>Year</th>
+          <th>Present</th><th>Total</th><th>%</th><th>Needed for 75%</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const defaultUser = { username: "admin", password: "admin123" };
+    if (!localStorage.getItem("user")) {
+      localStorage.setItem("user", JSON.stringify(defaultUser));
+    }
+
+    const alertAudio = document.getElementById("alertAudio");
+
+    function login() {
+      const u = document.getElementById("username").value;
+      const p = document.getElementById("password").value;
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (u === user.username && p === user.password) {
+        document.getElementById("loginContainer").style.display = "none";
+        document.getElementById("mainContainer").style.display = "block";
+        loadStudents();
+      } else {
+        alert("Invalid credentials!");
+      }
+    }
+
+    function logout() {
+      document.getElementById("loginContainer").style.display = "block";
+      document.getElementById("mainContainer").style.display = "none";
+    }
+
+    function changePassword() {
+      const oldPass = prompt("Enter current password:");
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (oldPass === user.password) {
+        const newPass = prompt("Enter new password:");
+        if (newPass) {
+          user.password = newPass;
+          localStorage.setItem("user", JSON.stringify(user));
+          alert("Password updated!");
+        }
+      } else {
+        alert("Incorrect current password!");
+      }
+    }
+
+    function forgotPassword() {
+      const user = JSON.parse(localStorage.getItem("user"));
+      const otp = Math.floor(1000 + Math.random() * 9000);
+      const enteredOtp = prompt("OTP sent (simulated): " + otp + "\nEnter OTP:");
+      if (enteredOtp == otp) {
+        const newPass = prompt("Enter new password:");
+        if (newPass) {
+          user.password = newPass;
+          localStorage.setItem("user", JSON.stringify(user));
+          alert("Password reset!");
+        }
+      } else {
+        alert("Incorrect OTP!");
+      }
+    }
+
+    let students = JSON.parse(localStorage.getItem("students") || "[]");
+
+    function saveStudents() {
+      localStorage.setItem("students", JSON.stringify(students));
+    }
+
+    function addStudent() {
+      const name = document.getElementById("name").value;
+      const roll = document.getElementById("roll").value;
+      const dept = document.getElementById("dept").value;
+      const year = parseInt(document.getElementById("year").value);
+      if (!name || !roll || !dept || !year) return alert("Fill all fields");
+      if (students.some(s => s.roll === roll)) return alert("Roll number exists");
+      students.push({ name, roll, dept, year, attended: 0, total: 0, attendanceRecord: [] });
+      saveStudents();
+      loadStudents();
+    }
+
+    function markAttendance() {
+      const date = new Date().toISOString().slice(0, 10);
+      const container = document.getElementById("attendanceMarking");
+      container.innerHTML = `<h3>Mark Attendance for ${date}</h3>
+      <table border="1" style="width:100%;margin:10px 0;">
+        <tr><th>Name</th><th>Roll</th><th>Status</th></tr>
+      </table>
+      <button onclick="submitAttendance('${date}')">Submit</button>`;
+
+      const table = container.querySelector("table");
+
+      students.forEach((s, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${s.name}</td>
+          <td>${s.roll}</td>
+          <td>
+            <button onclick="setAttendance(${index}, '${date}', 'Present', this)">Present</button>
+            <button onclick="setAttendance(${index}, '${date}', 'Absent', this)">Absent</button>
+          </td>
+        `;
+        table.appendChild(row);
+      });
+    }
+
+    function setAttendance(index, date, status, btn) {
+      const student = students[index];
+      if (student.attendanceRecord.some(r => r.date === date)) {
+        alert("Already marked!");
+        return;
+      }
+      student.attendanceRecord.push({ date, status });
+      if (status === "Present") students[index].attended++;
+      students[index].total++;
+
+      const td = btn.parentElement;
+      td.innerHTML = `<strong>${status}</strong>`;
+    }
+
+    function submitAttendance(date) {
+      const markedAll = students.every(s => s.attendanceRecord.some(r => r.date === date));
+      if (!markedAll) return alert("Please mark all students before submitting.");
+      saveStudents();
+      loadStudents();
+      document.getElementById("attendanceMarking").innerHTML = "";
+      alert("Attendance submitted!");
+    }
+
+    function deleteStudent(index) {
+      if (confirm("Delete this student?")) {
+        students.splice(index, 1);
+        saveStudents();
+        loadStudents();
+      }
+    }
+
+    function calculateNeeded(attended, total) {
+      let needed = 0;
+      while (((attended + needed) / (total + needed)) * 100 < 75) {
+        needed++;
+      }
+      return needed;
+    }
+
+    function filterStudents() {
+      const dept = document.getElementById("filterDept").value.trim().toLowerCase();
+      const year = document.getElementById("filterYear").value;
+      const filterDate = document.getElementById("filterDate").value;
+      const filterMonth = document.getElementById("filterMonth").value;
+      const filterAttendanceYear = document.getElementById("filterAttendanceYear").value;
+      const tbody = document.querySelector("#studentTable tbody");
+      tbody.innerHTML = "";
+
+      students.forEach((s, index) => {
+        const matchesDept = !dept || s.dept.toLowerCase() === dept;
+        const matchesYear = !year || s.year == year;
+        const matchesDate = !filterDate || s.attendanceRecord.some(r => r.date === filterDate);
+        const matchesMonth = !filterMonth || s.attendanceRecord.some(r => new Date(r.date).getMonth() + 1 == filterMonth);
+        const matchesAttYear = !filterAttendanceYear || s.attendanceRecord.some(r => new Date(r.date).getFullYear() == filterAttendanceYear);
+
+        if (matchesDept && matchesYear && matchesDate && matchesMonth && matchesAttYear) {
+          const percent = s.total > 0 ? ((s.attended / s.total) * 100).toFixed(2) : "0";
+          const row = tbody.insertRow();
+          row.innerHTML = `<td>${s.name}</td><td>${s.roll}</td><td>${s.dept}</td><td>${s.year}</td>
+            <td>${s.attended}</td><td>${s.total}</td><td>${percent}</td>
+            <td>${calculateNeeded(s.attended, s.total)}</td>
+            <td class="actions"><button onclick="deleteStudent(${index})">Delete</button></td>`;
+        }
+      });
+    }
+
+    function loadStudents() {
+      const tbody = document.querySelector("#studentTable tbody");
+      tbody.innerHTML = "";
+      students.forEach((s, index) => {
+        const percent = s.total > 0 ? ((s.attended / s.total) * 100).toFixed(2) : "0";
+        const row = tbody.insertRow();
+        row.innerHTML = `<td>${s.name}</td><td>${s.roll}</td><td>${s.dept}</td><td>${s.year}</td>
+          <td>${s.attended}</td><td>${s.total}</td><td>${percent}</td>
+          <td>${calculateNeeded(s.attended, s.total)}</td>
+          <td class="actions"><button onclick="deleteStudent(${index})">Delete</button></td>`;
+      });
+    }
+
+    function exportToExcel() {
+      const data = students.map(s => ({
+        Name: s.name,
+        Roll: s.roll,
+        Dept: s.dept,
+        Year: s.year,
+        Present: s.attended,
+        Total: s.total,
+        Percentage: s.total > 0 ? ((s.attended / s.total) * 100).toFixed(2) : "0"
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+      XLSX.writeFile(wb, "Attendance.xlsx");
+    }
+  </script>
+</body>
+</html>
